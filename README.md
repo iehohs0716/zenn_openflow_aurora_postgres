@@ -8,7 +8,6 @@ Aurora (ソースDB) ── 差分CDC ──> Openflow (SPCS) ──> Snowflake 
 
 - Aurora はプライベートサブネットに置き、SPCS からは Data Connectivity Proxy (DCP) 経由で接続します。
 - AWS / Snowflake のリソースはすべて Terraform で管理します。
-- 詳しい方針・設計は [AGENTS.md](./AGEN
 
 ## 必要なツール
 

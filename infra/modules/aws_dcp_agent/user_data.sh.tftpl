@@ -1,0 +1,75 @@
+#!/bin/bash
+set -euo pipefail
+
+echo "[dcp-agent] Docker をインストールします"
+dnf install -y docker
+systemctl enable --now docker
+
+# Snowflake DCPで発行したトークンファイルの書き込み先
+SECRET_DIR=/etc/dcp-agent/secrets
+TOKEN_FILE="$SECRET_DIR/dcp-bootstrap-token"
+mkdir -p "$SECRET_DIR"
+
+# SecretManagerにあれば取得する
+echo "[dcp-agent] ブートストラップトークンを取得します"
+TOKEN=""
+for i in $(seq 1 30); do
+  TOKEN=$(aws secretsmanager get-secret-value \
+    --region "${region}" --secret-id "${secret_id}" \
+    --query SecretString --output text || true)
+  if [ -n "$TOKEN" ] && [ "$TOKEN" != "PLACEHOLDER" ]; then
+    break
+  fi
+  echo "[dcp-agent] トークン未投入です。10 秒後に再試行します ($i/30)"
+  sleep 10
+done
+
+if [ -z "$TOKEN" ] || [ "$TOKEN" = "PLACEHOLDER" ]; then
+  echo "[dcp-agent] エラー: トークンを取得できませんでした" >&2
+  exit 1
+fi
+TOKEN=""
+
+# 公式 (Set up Data Connectivity Proxy: Store the token in a secrets manager) の手順そのまま
+umask 077
+aws secretsmanager get-secret-value \
+  --region "${region}" \
+  --secret-id "${secret_id}" \
+  --query SecretString \
+  --output text > "$TOKEN_FILE"
+chmod 600 "$TOKEN_FILE"
+
+# === ここから非公式手順 ==================================================================
+# [公式のセットアップ手順](https://docs.snowflake.com/en/user-guide/data-connectivity-proxy-setup)には書かれていない作業
+
+# 権限 600 のままコンテナから読めるよう、専用ユーザー (固定 UID) を作り、
+# トークンファイルの所有者とコンテナ内のプロセスの UID を揃える。
+# イメージの USER 指定は docker run --user で上書きされるため、イメージ側のユーザーを調べる必要はない。
+# docker の実行自体は root のまま (専用ユーザーを docker グループに入れない)
+AGENT_USER=dcp-agent
+AGENT_UID=10001
+
+# snowflakedb/dcp-client:latestのconfig.User)は 65532(非 root)となっているのに対し、
+# user_dataスクリプトはroot権限で実行される。これにより、コンテナで動かす場合にroot権限で作成されたトークンファイルが読めない問題が発生する。
+# それを防ぐため、rootとも65532とも異なるユーザを用意し、①ファイルの所有者権限を渡し、さらに、②コンテナの実行ユーザもそのユーザにする。
+# [公式のセットアップ手順](https://docs.snowflake.com/en/user-guide/data-connectivity-proxy-setup)のStep3,4の通りにやると、
+# コンテナのログ上で以下のようなエラーが出てしまう。
+# agent error: bootstrap credential file: failed to read /etc/dcp-agent/secrets/dcp-bootstrap-token: Permission denied (os error 13)
+echo "[dcp-agent] 専用ユーザー ($AGENT_USER, UID $AGENT_UID) を作成します"
+if ! id "$AGENT_USER" &> /dev/null; then
+  groupadd --system --gid "$AGENT_UID" "$AGENT_USER"
+  useradd --system --uid "$AGENT_UID" --gid "$AGENT_UID" \
+    --no-create-home --shell /sbin/nologin "$AGENT_USER"
+fi
+chown "$AGENT_UID:$AGENT_UID" "$TOKEN_FILE"
+
+# === ここまで非公式手順 ==================================================================
+
+# dockerコンテナの実行
+# 基本的に公式のセットアップ手順と同じであるが、ファイル権限の問題を回避するため専用のユーザでコンテナを立ち上げている
+echo "[dcp-agent] エージェントを起動します"
+docker run -d --name dcp-agent --restart unless-stopped \
+  --user "$AGENT_UID:$AGENT_UID" \
+  -v "$TOKEN_FILE:$TOKEN_FILE:ro" \
+  -e DCP_METRICS_PORT=9092 \
+  "${agent_image}"

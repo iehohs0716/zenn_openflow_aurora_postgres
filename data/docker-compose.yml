@@ -1,0 +1,23 @@
+# Aurora へ SQL を送るツールのコンテナ。scripts/ のスクリプトから `docker compose run --rm` で呼ばれる
+# (手元に psql / session-manager-plugin を入れない)
+# Session Manager用のCLIがインストールされているとは限らないので、Dockerで個別に環境を用意
+# 環境変数は、値を書かずに名前だけ並べて、呼び出し元 (scripts/common/db.sh) の環境変数をそのまま渡す。
+# AWS の認証情報は、aws-vault または aws configure export-credentials で、呼び出し元が環境変数に入れる
+services:
+  tools:
+    build: ./docker
+    image: openflow-aurora-data-tools:local
+    volumes:
+      - ./postgres:/data/postgres:ro
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_REGION
+      - TARGET_INSTANCE_ID
+      - DB_HOST
+      - DB_PORT
+      - DB_NAME
+      - DB_SECRET_ARN
+      # cdc/001_replication.sql が取り込む (レプリケーション用ユーザーのパスワード。未設定でもよい)
+      - REPL_PASSWORD

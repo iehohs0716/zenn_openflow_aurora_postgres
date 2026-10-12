@@ -1,0 +1,18 @@
+# 機密情報
+.env
+**/*.tfvars
+**/backend.tfbackend
+# Openflow コネクタの設定の控え (環境固有の値が入る)
+connector/
+**/*.p8
+**/*.pem
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/tfplan*
+**/*.tfstate
+**/*.tfstate.backup
+**/.terraform.tfstate.lock.info
+
+.DS_Store

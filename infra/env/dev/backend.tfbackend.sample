@@ -1,0 +1,6 @@
+# Terraform の state を置く既存の S3 バケット。backend.tfbackend にコピーして値を入れる
+bucket = "your-tfstate-bucket"
+key          = "openflow_aurora/terraform.tfstate"
+region       = "ap-northeast-1"
+use_lockfile = true
+encrypt      = true

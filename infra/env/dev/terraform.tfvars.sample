@@ -1,0 +1,27 @@
+project_name = "<プロジェクト名 (kebab-case。全リソース名のプレフィックスになる)>"
+owner = "<作成者の識別子 (タグ Owner / CreatedBy に付く)>"
+aws_region           = "ap-northeast-1"
+vpc_cidr             = "10.0.0.0/16"
+availability_zones   = ["ap-northeast-1a", "ap-northeast-1c"]
+public_subnet_cidrs  = ["10.0.0.0/24", "10.0.1.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
+enable_nat_gateway   = true
+
+db_port         = 5432
+dcp_agent_count = 1
+
+# Snowflake (接続先とユーザーは .env の SNOWFLAKE_* で指定する)
+snowflake_private_key_path = "~/.snowflake/<秘密鍵>.p8"
+snowflake_dcp_name         = "your_dcp_client"
+snowflake_database         = "<既存のデータベース名>"
+snowflake_schema           = "<既存のスキーマ名>"
+
+# Openflow (ウェアハウスは既存のものを指定する。ロールは作成する)
+snowflake_warehouse             = "<既存のウェアハウス名>"
+snowflake_openflow_admin_role   = "OPENFLOW_ADMIN"
+snowflake_openflow_runtime_role = "OPENFLOW_RUNTIME_ROLE"
+snowflake_openflow_deployment   = "AURORA_CDC_DEPLOYMENT"
+snowflake_openflow_runtime_name = "AURORA_CDC_RUNTIME"
+snowflake_openflow_connector_name         = "<コネクタ名>"
+snowflake_openflow_connector_display_name = "<表示名 (任意)>"
+snowflake_openflow_admin_granted_to_roles = ["SYSADMIN"] # .env の SNOWFLAKE_ROLE と同じにする
